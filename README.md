@@ -198,6 +198,13 @@ with both certificate size and latency: at 200 ms, `mldsa87` drops from 9.6 s
 
 Full per-authentication JSON records are available in `results/`.
 
+![Wall-clock authentication time, passthrough vs reassemble, across 20/100/200 ms RTT](results/wallclock.png)
+
+*Wall-clock authentication time (mean of 3 runs) for passthrough vs reassemble,
+one panel per simulated RadSec RTT, with algorithms ordered by increasing
+certificate chain size. The graph is generated from the table below by
+`scripts/plot_results.py`.*
+
 | Algorithm | Family | Chain bytes | EAP frags | Mode | RTT | Upstream round-trips | Wall-clock (ms) |
 |-----------|--------|------------:|----------:|------|----:|---------------------:|----------------:|
 | `rsa` (2048)            | RSA (classical) | 4,242 | 15 | passthrough | 20 ms  | 9  | 356    |
