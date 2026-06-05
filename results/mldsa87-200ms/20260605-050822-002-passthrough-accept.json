@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-06-05T05:08:22+00:00",
+  "key": "st:c907bf5d8277c119c8a329aabc59f9ea",
+  "mode": "passthrough",
+  "result": "accept",
+  "duration_ms": 9596.42,
+  "upstream_round_trips": 44,
+  "downstream_fragment_size": 1000,
+  "upstream_fragment_size": 65000,
+  "supplicant_to_server": {
+    "fragments_in": 43,
+    "acks_generated": 0,
+    "bytes": 0
+  },
+  "server_to_supplicant": {
+    "fragments_out": 42,
+    "acks_generated": 0,
+    "bytes": 0
+  }
+}

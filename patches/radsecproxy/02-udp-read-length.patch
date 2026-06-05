@@ -1,0 +1,13 @@
+diff --git a/udp.c b/udp.c
+index 3e987a0..01ba742 100644
+--- a/udp.c
++++ b/udp.c
+@@ -174,7 +174,7 @@ int radudpget(int s, struct client **client, struct server **server, unsigned ch
+             sock_dgram_skip(s);
+             continue;
+         }
+-        if (len > 4096) {
++        if (len > 65535) {
+             debug(DBG_WARN, "radudpget: length too big");
+             sock_dgram_skip(s);
+             continue;

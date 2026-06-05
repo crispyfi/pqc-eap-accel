@@ -1,0 +1,23 @@
+mode: passthrough
+
+max_message_len: 262144
+
+# Directory for per-auth JSON records (one self-describing file per completed
+# auth). Defaults to proxy/output. Uncomment to override (relative paths are
+# resolved from the current working directory); --output takes precedence.
+# output_dir: /var/lib/eap-accel/output
+
+# --- Downstream: NAS-facing RADIUS server -----------------------------------
+downstream:
+  listen_host: 0.0.0.0
+  listen_port: 1812
+  shared_secret: radsec
+  fragment_size: 1000
+
+# --- Upstream: plain RADIUS/UDP to local radsecproxy -----------------------
+upstream:
+  host: 127.0.0.1
+  port: 11812
+  shared_secret: radsec
+  fragment_size: 65000
+  framed_mtu: 65000

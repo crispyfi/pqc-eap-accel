@@ -1,0 +1,15 @@
+diff --git a/src/modules/rlm_eap/libeap/eapcommon.c b/src/modules/rlm_eap/libeap/eapcommon.c
+index 12399696ed..f8e85aeb24 100644
+--- a/src/modules/rlm_eap/libeap/eapcommon.c
++++ b/src/modules/rlm_eap/libeap/eapcommon.c
+@@ -458,8 +458,8 @@ eap_packet_raw_t *eap_vp2packet(TALLOC_CTX *ctx, VALUE_PAIR *vps)
+                         */
+                        memcpy(&tls_len, eap_packet->data + 2, 4);
+                        tls_len = ntohl(tls_len);
+-                       if (tls_len > 16384) {
+-                               fr_strerror_printf("Malformed EAP packet - TLS reassembled data length %u (%08x) (will be greater than the TLS maximum record size of 16384 bytes", tls_len, tls_len);
++                       if (tls_len > 163840) {
++                               fr_strerror_printf("Malformed EAP packet - TLS reassembled data length %u (%08x) (will be greater than the TLS maximum record size of 163840 bytes", tls_len, tls_len);
+                                talloc_free(eap_packet);
+                                return NULL;
+                        }

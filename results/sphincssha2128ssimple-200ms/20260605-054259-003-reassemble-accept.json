@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-06-05T05:42:59+00:00",
+  "key": "st:352a52229fecb6503844fddfb3bdf541",
+  "mode": "reassemble",
+  "result": "accept",
+  "duration_ms": 4161.42,
+  "upstream_round_trips": 4,
+  "downstream_fragment_size": 1000,
+  "upstream_fragment_size": 65000,
+  "supplicant_to_server": {
+    "fragments_in": 54,
+    "acks_generated": 25,
+    "bytes": 25689
+  },
+  "server_to_supplicant": {
+    "fragments_out": 28,
+    "acks_generated": 26,
+    "bytes": 26550
+  }
+}

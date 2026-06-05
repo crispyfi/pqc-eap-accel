@@ -1,0 +1,9 @@
+# Patch files are byte-sensitive: a unified diff's context lines (including
+# blank ones) must keep their exact leading whitespace and the file its trailing
+# newline. Tell git never to do EOL/whitespace normalisation on them, so they
+# can't be silently corrupted on checkout across platforms.
+#
+# NOTE: this does NOT stop an editor from trimming trailing whitespace on save —
+# if you open a *.patch in an editor, disable "trim trailing whitespace" for it,
+# or you'll strip the leading space off blank context lines and break the patch.
+*.patch -text -whitespace

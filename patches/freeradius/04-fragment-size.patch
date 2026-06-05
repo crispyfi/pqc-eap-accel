@@ -1,0 +1,14 @@
+diff --git a/src/modules/rlm_eap/libeap/eap_tls.c b/src/modules/rlm_eap/libeap/eap_tls.c
+index fe07ef18d4..3d826b39b2 100644
+--- a/src/modules/rlm_eap/libeap/eap_tls.c
++++ b/src/modules/rlm_eap/libeap/eap_tls.c
+@@ -1309,7 +1309,7 @@ fr_tls_server_conf_t *eaptls_conf_parse(CONF_SECTION *cs, char const *attr)
+         *      and State (18), etc. results in about 4000 bytes of data
+         *      that can be devoted *solely* to EAP.
+         */
+-       if (tls_conf->fragment_size > 4000) {
+-               ERROR("Configured fragment size is too large, must be <= 4000");
++       if (tls_conf->fragment_size > 65535) {
++               ERROR("Configured fragment size is too large, must be <= 65535");
+                return NULL;
+        }

@@ -1,0 +1,13 @@
+diff --git a/src/include/tls-h b/src/include/tls-h
+index 2228e80cc9..10dd2e098f 100644
+--- a/src/include/tls-h
++++ b/src/include/tls-h
+@@ -67,7 +67,7 @@ typedef enum {
+ } fr_tls_status_t;
+ extern FR_NAME_NUMBER const fr_tls_status_table[];
+ 
+-#define MAX_RECORD_SIZE 65536
++#define MAX_RECORD_SIZE 65536 * 100
+ 
+ /*
+  *     A single TLS record may be up to 16384 octets in length, but a

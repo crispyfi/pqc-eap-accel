@@ -1,0 +1,15 @@
+diff --git a/src/modules/rlm_eap/mem.c b/src/modules/rlm_eap/mem.c
+index 680c879130..8e6b8e7fe4 100644
+--- a/src/modules/rlm_eap/mem.c
++++ b/src/modules/rlm_eap/mem.c
+@@ -468,8 +468,8 @@ eap_handler_t *eaplist_find(rlm_eap_t *inst, REQUEST *request,
+                return NULL;
+        }
+ 
+-       if (handler->trips >= 50) {
+-               RERROR("rlm_eap (%s): Aborting! More than 50 roundtrips "
++       if (handler->trips >= 500) {
++               RERROR("rlm_eap (%s): Aborting! More than 500 roundtrips "
+                       "made in session with state "
+                       "0x%02x%02x%02x%02x%02x%02x%02x%02x",
+                       inst->xlat_name,

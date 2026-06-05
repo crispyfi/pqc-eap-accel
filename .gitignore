@@ -1,0 +1,26 @@
+certs/
+certs_all/
+*.local.yaml
+*.pem
+*.key
+config.yaml
+
+# Runtime output
+output/
+
+# Packet captures — ignore by default so ad-hoc sweep captures don't end up
+# in git. Whitelist any canonical baseline you want tracked, e.g.:
+#   !pcaps/<name>.pcapng
+*.pcap
+*.pcapng
+
+# Whitelisted canonical captures referenced from README.md ("Packet captures").
+!pcaps/*.pcapng
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store

@@ -1,0 +1,13 @@
+diff --git a/radmsg.h b/radmsg.h
+index 8e11885..bfc6138 100644
+--- a/radmsg.h
++++ b/radmsg.h
+@@ -10,7 +10,7 @@
+ #include <stdint.h>
+ 
+ #define RAD_Min_Length 20
+-#define RAD_Max_Length 4096
++#define RAD_Max_Length 65535
+ #define RAD_Max_Attr_Value_Length 253
+ 
+ #define RAD_Access_Request 1

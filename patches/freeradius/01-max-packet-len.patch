@@ -1,0 +1,13 @@
+diff --git a/src/include/radius.h b/src/include/radius.h
+index 147d674eed..3aaf7bdd3a 100644
+--- a/src/include/radius.h
++++ b/src/include/radius.h
+@@ -76,7 +76,7 @@ typedef enum {
+ /*
+  *  The RFC says 4096 octets max, and most packets are less than 256.
+  */
+-#define MAX_PACKET_LEN 4096
++#define MAX_PACKET_LEN 65535
+ 
+ #include <freeradius-devel/rfc2865.h>
+ #include <freeradius-devel/rfc2866.h>

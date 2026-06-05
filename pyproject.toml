@@ -1,0 +1,36 @@
+# pyproject.toml — packaging for the EAP Acceleration proxy.
+#
+# The Python code lives under proxy/ and imports as the `proxy` package
+# (e.g. `import proxy.config`). This file lets `uv` build a venv with the
+# dependencies and expose the proxy as the `eap-accel` console command.
+#
+# On a proxy VM, `proxy/setup.sh` runs `uv sync` (which creates ./.venv and
+# installs this project EDITABLE, so edits to proxy/*.py take effect with no
+# reinstall) and symlinks .venv/bin/eap-accel into /usr/local/bin so the proxy
+# is runnable from any directory — see proxy/INSTALL.md.
+
+[project]
+name = "eap-accel"
+version = "0.1.0"
+description = "EAP Acceleration — a bidirectional EAP-TLS fragment-mediation proxy"
+requires-python = ">=3.12"
+dependencies = [
+    "pyrad==2.5.4",
+    "PyYAML>=6.0",
+]
+
+# The `eap-accel` command -> proxy/proxy.py:main_cli. `uv sync` writes a
+# launcher to .venv/bin/eap-accel whose shebang is the venv's own python, so the
+# symlinked command runs standalone with no `uv` needed at runtime. The proxy
+# listens on UDP/1812 (unprivileged), so it does NOT need root.
+[project.scripts]
+eap-accel = "proxy.proxy:main_cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The distribution is named `eap-accel` but the importable package is `proxy`;
+# tell hatchling where the package actually is.
+[tool.hatch.build.targets.wheel]
+packages = ["proxy"]
