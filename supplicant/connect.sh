@@ -7,6 +7,11 @@ set -euo pipefail
 # wlan.conf is loaded from beside this script, not the caller's $PWD.
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 
+# Run from $DIR so the *relative* cert paths inside wlan.conf (certs/ca.pem,
+# etc.) resolve beside this script. wpa_supplicant resolves those against its
+# working directory, and sudo preserves CWD into the child process.
+cd "$DIR"
+
 # IFACE overridable for hosts whose wireless interface isn't wlan0.
 IFACE="${IFACE:-wlan0}"
 
@@ -21,4 +26,4 @@ OPENSSL_CONF="${OPENSSL_CONF:-$DIR/openssl.conf}"
 # Pass OPENSSL_CONF *through* sudo with `env`: sudo resets the environment, so
 # exporting it in this shell alone wouldn't reach the wpa_supplicant process.
 sudo env OPENSSL_CONF="$OPENSSL_CONF" \
-    wpa_supplicant -i "$IFACE" -c "$DIR/wlan.conf" -D nl80211 -dd
+    /usr/local/sbin/wpa_supplicant -i "$IFACE" -c "$DIR/wlan.conf" -D nl80211 -dd

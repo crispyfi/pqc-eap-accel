@@ -4,9 +4,11 @@
 #   - radsecproxy (patched, source)  (RadSec/TLS server termination)
 #   - FreeRADIUS 3.2.8 (patched)     (EAP-TLS state machine + cert validation)
 #   - install configs, cert Makefile, and helper scripts into /usr/local/etc/raddb
+#   - tune installed radiusd.conf (max_attributes) for reassembled PQC flights
 #
 # It does NOT generate certs or start daemons — that's the runbook in INSTALL.md.
-# Read INSTALL.md alongside this; the patches are explained in ../patches/README.md.
+# Read INSTALL.md alongside this; the patches are explained in the patches section
+# of the repo README (../README.md).
 #
 # Override from the environment if your layout differs:
 #   SRC_DIR          where sources are cloned     (default: $HOME/src)
@@ -32,7 +34,7 @@ apply_patches() {
     if [ ${#patches[@]} -eq 0 ]; then
         echo "!! WARNING: no patches in $dir" >&2
         echo "   building UNPATCHED — large PQC packets will be rejected." >&2
-        echo "   See $REPO_ROOT/patches/README.md to capture them." >&2
+        echo "   See the patches section of $REPO_ROOT/README.md." >&2
         return 0
     fi
     # --recount tolerates hunk line-count drift; --ignore-whitespace lets the
@@ -97,6 +99,16 @@ sudo install -m 0755 "$HERE/generate.sh"       "$RADDB/generate.sh"
 sudo install -m 0755 "$HERE/algorithm.sh"      "$RADDB/algorithm.sh"
 sudo install -m 0755 "$HERE/freeradius-pqc.sh" "$RADDB/freeradius-pqc.sh"
 sudo install -m 0755 "$HERE/latency.sh"        "$RADDB/latency.sh"
+
+echo "==> raise RADIUS max_attributes for reassembled PQC EAP-TLS flights"
+# A reassembled PQC cert flight arrives as ONE Access-Request carrying >200
+# EAP-Message attributes (each <=253 bytes); FreeRADIUS's default
+# max_attributes=200 misreads that as a DoS flood ("Too many attributes in
+# request") and drops it. radiusd.conf is written by `make install` above and
+# is NOT shipped in this repo, so edit the installed copy in place. Idempotent:
+# re-running just re-sets whatever value is present to 1024.
+sudo sed -i -E 's/^([[:space:]]*max_attributes[[:space:]]*=[[:space:]]*)[0-9]+/\11024/' \
+    "$RADDB/radiusd.conf"
 
 echo "==> install radsecproxy.conf"
 sudo install -m 0644 "$HERE/radsecproxy.conf"  /usr/local/etc/radsecproxy.conf

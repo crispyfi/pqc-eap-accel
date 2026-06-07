@@ -1,0 +1,11 @@
+diff --git a/src/eap_peer/eap.c b/src/eap_peer/eap.c
+--- a/src/eap_peer/eap.c
++++ b/src/eap_peer/eap.c
+@@ -32,6 +32,6 @@
+ #define STATE_MACHINE_DATA struct eap_sm
+ #define STATE_MACHINE_DEBUG_PREFIX "EAP"
+
+-#define EAP_MAX_AUTH_ROUNDS 100
++#define EAP_MAX_AUTH_ROUNDS 1000
+ #define EAP_MAX_AUTH_ROUNDS_SHORT 50
+ #define EAP_CLIENT_TIMEOUT_DEFAULT 60

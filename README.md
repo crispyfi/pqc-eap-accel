@@ -36,6 +36,7 @@ At a high-level, the proposed EAP Acceleration method involves three things:
 
 The result is for most of the journey, including the potentially latent path from the Authenticator to the Authentication server, the large certificate flights behave like most other traffic on the Internet. This means that in most cases, larger certificate sizes do not require more round-trips across the latent links, and latency is a much smaller factor than it otherwise would be.
 
+
 ## How it works
 
 The steps below describe **reassemble** mode; passthrough forwards fragments verbatim — see the diagrams below.
@@ -185,16 +186,44 @@ Each row is the mean of 3 authentications. **Chain bytes** is the reassembled
 server flight (ServerHello … Certificate … ServerHelloDone), and **EAP frags**
 is the total number of EAP-TLS fragments exchanged with the supplicant
 (server→supplicant + supplicant→server). **RTT** is the netem one-way delay
-applied to the RadSec leg (see the methodology caveat below). **Upstream
+applied to the RadSec leg. **Upstream
 round-trips** counts the RADIUS request/response exchanges that actually cross
-that latent leg — the figure reassemble collapses to a constant.
+that latent leg.
 
 Across every algorithm, passthrough's upstream round-trips scale with the
 fragment count (and so does wall-clock as RTT grows), while reassemble holds at
-**4 upstream round-trips** regardless of chain size — the certificate flights
-cross the latent leg as single un-fragmented RADIUS messages. The gap widens
-with both certificate size and latency: at 200 ms, `mldsa87` drops from 9.6 s
-(passthrough) to 1.6 s (reassemble).
+**4 upstream round-trips** for any chain that fits a single un-fragmented RADIUS
+message — the certificate flights cross the latent leg as one TCP stream rather
+than dozens of acknowledged fragments. The only exception is
+`sphincssha2192fsimple`, whose ~110 KB flight exceeds the maximum RADIUS message
+size and must span two messages, lifting reassemble to a still-constant **6**.
+The gap widens with both certificate size and latency: at 200 ms,
+`sphincssha2192fsimple` drops from 46.2 s (passthrough) to 4.3 s (reassemble),
+and even `mldsa87` drops from 9.6 s to 1.6 s.
+
+Put as a rate: because each upstream round-trip pays the link latency once,
+passthrough's wall-clock climbs by roughly its round-trip count for every
+millisecond added to the RadSec leg — about 45 ms/ms for `mldsa87` and
+216 ms/ms for `sphincssha2192fsimple` across the 20–200 ms range. Reassemble's
+fixed 4–6 round-trips flatten that to 6–12 ms/ms, a 7–17× smaller latency
+penalty.
+
+Authenticating a 22 KB `mldsa87` chain with EAP Acceleration
+costs about the same as a 4 KB `rsa` 2048 chain without it — and once the RadSec
+leg has any real latency (≥100 ms), accelerated `mldsa87` is the faster of the
+two.
+
+
+One ordering caveat: SPHINCS+ comes in slow-but-small (`s`) and fast-but-large
+(`f`) variants, so `sphincs128s` has a smaller chain than `sphincs128f` but much
+slower signing/verification. At 20 ms that fixed compute cost dominates and
+`128s` is slower despite the smaller cert; as RTT rises the per-fragment network
+cost takes over and the bars return to chain-size order. This has a practical
+consequence: because acceleration makes the larger flight nearly free, the fast
+`f` variant authenticates faster than `s` at *every* latency in reassemble mode
+(e.g. 1.1 s vs 3.1 s at 20 ms). The usual advice to prefer the small-signature
+`s` variant to save bytes inverts under EAP Acceleration — once transport is
+cheap, compute is all that's left, so pick `f`.
 
 Full per-authentication JSON records are available in `results/`.
 
@@ -202,8 +231,9 @@ Full per-authentication JSON records are available in `results/`.
 
 *Wall-clock authentication time (mean of 3 runs) for passthrough vs reassemble,
 one panel per simulated RadSec RTT, with algorithms ordered by increasing
-certificate chain size. The graph is generated from the table below by
-`scripts/plot_results.py`.*
+certificate chain size. Each panel is scaled to its own y-axis — note the
+differing maxima (~7 s / 25 s / 46 s) when comparing across RTTs. The graph is
+generated from the table below by `scripts/plot_results.py`.*
 
 | Algorithm | Family | Chain bytes | EAP frags | Mode | RTT | Upstream round-trips | Wall-clock (ms) |
 |-----------|--------|------------:|----------:|------|----:|---------------------:|----------------:|
@@ -213,12 +243,24 @@ certificate chain size. The graph is generated from the table below by
 | `rsa` (2048)            | RSA (classical) | 4,242 | 15 | reassemble  | 100 ms | 4  | 559    |
 | `rsa` (2048)            | RSA (classical) | 4,242 | 15 | passthrough | 200 ms | 9  | 1,995  |
 | `rsa` (2048)            | RSA (classical) | 4,242 | 15 | reassemble  | 200 ms | 4  | 949    |
+| `falcon512`             | FN-DSA (FIPS 206) | 6,656 | 27 | passthrough | 20 ms  | 15 | 569    |
+| `falcon512`             | FN-DSA (FIPS 206) | 6,656 | 22 | reassemble  | 20 ms  | 4  | 240    |
+| `falcon512`             | FN-DSA (FIPS 206) | 6,656 | 27 | passthrough | 100 ms | 15 | 1,754  |
+| `falcon512`             | FN-DSA (FIPS 206) | 6,656 | 22 | reassemble  | 100 ms | 4  | 569    |
+| `falcon512`             | FN-DSA (FIPS 206) | 6,656 | 27 | passthrough | 200 ms | 15 | 3,255  |
+| `falcon512`             | FN-DSA (FIPS 206) | 6,656 | 22 | reassemble  | 200 ms | 4  | 963    |
 | `falcon1024`            | FN-DSA (FIPS 206) | 10,293 | 41 | passthrough | 20 ms  | 22 | 762    |
 | `falcon1024`            | FN-DSA (FIPS 206) | 10,293 | 34 | reassemble  | 20 ms  | 4  | 301    |
 | `falcon1024`            | FN-DSA (FIPS 206) | 10,293 | 41 | passthrough | 100 ms | 22 | 2,567  |
 | `falcon1024`            | FN-DSA (FIPS 206) | 10,293 | 34 | reassemble  | 100 ms | 4  | 618    |
 | `falcon1024`            | FN-DSA (FIPS 206) | 10,293 | 41 | passthrough | 200 ms | 22 | 4,833  |
 | `falcon1024`            | FN-DSA (FIPS 206) | 10,293 | 34 | reassemble  | 200 ms | 4  | 1,028  |
+| `mldsa44`               | ML-DSA (FIPS 204) | 12,806 | 49 | passthrough | 20 ms  | 26 | 869    |
+| `mldsa44`               | ML-DSA (FIPS 204) | 12,806 | 40 | reassemble  | 20 ms  | 4  | 329    |
+| `mldsa44`               | ML-DSA (FIPS 204) | 12,806 | 49 | passthrough | 100 ms | 26 | 3,024  |
+| `mldsa44`               | ML-DSA (FIPS 204) | 12,806 | 40 | reassemble  | 100 ms | 4  | 644    |
+| `mldsa44`               | ML-DSA (FIPS 204) | 12,806 | 49 | passthrough | 200 ms | 26 | 5,702  |
+| `mldsa44`               | ML-DSA (FIPS 204) | 12,806 | 40 | reassemble  | 200 ms | 4  | 1,072  |
 | `mldsa65`               | ML-DSA (FIPS 204) | 16,753 | 65 | passthrough | 20 ms  | 34 | 1,216  |
 | `mldsa65`               | ML-DSA (FIPS 204) | 16,753 | 52 | reassemble  | 20 ms  | 4  | 468    |
 | `mldsa65`               | ML-DSA (FIPS 204) | 16,753 | 65 | passthrough | 100 ms | 34 | 3,989  |
@@ -237,10 +279,19 @@ certificate chain size. The graph is generated from the table below by
 | `sphincssha2128ssimple` | SLH-DSA (FIPS 205) | 26,550 | 82  | reassemble  | 100 ms | 4  | 3,599  |
 | `sphincssha2128ssimple` | SLH-DSA (FIPS 205) | 26,550 | 103 | passthrough | 200 ms | 53 | 13,962 |
 | `sphincssha2128ssimple` | SLH-DSA (FIPS 205) | 26,550 | 82  | reassemble  | 200 ms | 4  | 4,172  |
+| `sphincssha2128fsimple` | SLH-DSA (FIPS 205) | 54,290 | 207 | passthrough | 20 ms  | 105 | 3,616  |
+| `sphincssha2128fsimple` | SLH-DSA (FIPS 205) | 54,290 | 165 | reassemble  | 20 ms  | 4   | 1,125  |
+| `sphincssha2128fsimple` | SLH-DSA (FIPS 205) | 54,290 | 207 | passthrough | 100 ms | 105 | 12,321 |
+| `sphincssha2128fsimple` | SLH-DSA (FIPS 205) | 54,290 | 165 | reassemble  | 100 ms | 4   | 1,783  |
+| `sphincssha2128fsimple` | SLH-DSA (FIPS 205) | 54,290 | 207 | passthrough | 200 ms | 105 | 22,859 |
+| `sphincssha2128fsimple` | SLH-DSA (FIPS 205) | 54,290 | 165 | reassemble  | 200 ms | 4   | 2,541  |
+| `sphincssha2192fsimple` | SLH-DSA (FIPS 205) | 110,116 | 423 | passthrough | 20 ms  | 213 | 7,260  |
+| `sphincssha2192fsimple` | SLH-DSA (FIPS 205) | 110,116 | 334 | reassemble  | 20 ms  | 6   | 2,065  |
+| `sphincssha2192fsimple` | SLH-DSA (FIPS 205) | 110,116 | 423 | passthrough | 100 ms | 213 | 24,895 |
+| `sphincssha2192fsimple` | SLH-DSA (FIPS 205) | 110,116 | 334 | reassemble  | 100 ms | 6   | 3,049  |
+| `sphincssha2192fsimple` | SLH-DSA (FIPS 205) | 110,116 | 423 | passthrough | 200 ms | 213 | 46,229 |
+| `sphincssha2192fsimple` | SLH-DSA (FIPS 205) | 110,116 | 334 | reassemble  | 200 ms | 6   | 4,303  |
 
-
-
-I'm still planning to test sphincssha2192fsimple, but this will require a patch / build from source of wpa_supplicant since I hit the 100 round-trip limit.
 
 ## Packet captures
 
@@ -255,7 +306,7 @@ In a real-world deployment, the EAP Proxy would exist as a function on the Authe
 The Proxy is built with Pyrad listening on RADIUS/UDP and can be run in both `passthrough` and `reassemble` modes, with tunable parameters.
 
 Critical to EAP Acceleration, the Proxy uses RadSec (RADIUS over TLS) to connect to an Authentication Server.
-A localhost radsecproxy client runs on the Proxy VM, and a radsecproxy server listens on the Authentication Server to forward traffic to a localhost FreerRADIUS listener.
+A localhost radsecproxy client runs on the Proxy VM, and a radsecproxy server listens on the Authentication Server to forward traffic to a localhost FreeRADIUS listener.
 The outer-TLS channel between the radsecproxy client and server use traditional RSA certificates for simplicity.
 
 In a real-world deployment, an Authenticator would use RadSec to connect to an Authentication Server, which is already true for most Cloud-based NAC solutions.
@@ -334,6 +385,8 @@ See the **Setup Instructions** in the section above for each component.
 PQC Client and Server certificate chains are generated for all supported algorithms during the **Authentication Server** setup process.
 A specific algorithm can be loaded for use using the `algorithm` command on the **Supplicant** and **Authentication Server**.
 
+A single-tier CA is used for each algorithm, so only end-entity (leaf) certificates are exchanged during authentication. This keeps the lab simple, and reflects how a real deployment would likely behave: a mechanism such as EST (RFC 7030) or another out-of-band trust-anchor distribution would typically pre-provision the CA, removing the need to send intermediate certificates in-band.
+
 **Latency** can be introduced between the **Proxy** and **Authentication Server** by using the `latency` command on each of these VMs.
 
 The `freeradius-pqc`, `radsecproxy`, and `eap-accel` processes must be started manually in separate shells for clear visibility of logs during test runs.
@@ -390,15 +443,43 @@ rsa
 
 ---
 
-## FreeRADIUS and radsecproxy patches
+## wpa_supplicant, FreeRADIUS and radsecproxy patches
 
-`FreeRADIUS` imposes RADIUS/EAP packet-size and round-trip limits that are too small for large PQC certificate chains.
+`wpa_supplicant`, `FreeRADIUS`, and `radsecproxy` all impose EAP/RADIUS packet-size, TLS-message, and round-trip limits that were sized for classical (RSA/ECDSA) certificates and are too small for large PQC certificate chains.
 
-To support PQC certs, both are built from source with the below patches applied.
+To support PQC certs, all three are built from source with the below patches applied. Each host's `setup.sh` applies the patches in [`patches/`](patches/) automatically.
 
-Special thanks to [hs-esslingen-it-security](https://github.com/hs-esslingen-it-security) who identified these changes in [freeradius-server-pqc](https://github.com/lukas-popperl/freeradius-server-pqc).
+Special thanks to [hs-esslingen-it-security](https://github.com/hs-esslingen-it-security) who identified the `FreeRADIUS` changes in [freeradius-server-pqc](https://github.com/lukas-popperl/freeradius-server-pqc); their [wpa-enterprise-pqc](https://github.com/hs-esslingen-it-security/wpa-enterprise-pqc) project covers PQC support for `wpa_supplicant`.
 
-In addition the above changes, other changes are required to `FreeRADIUS` and `radsecproxy` to increase the maximum allowed RADIUS and UDP packet sizes, in addition to the maximum EAP-TLS fragment size.
+In addition to those changes, others are required to lift the maximum allowed RADIUS and UDP packet sizes, the EAP-TLS fragment/message sizes, and the per-session EAP round-trip caps.
+
+The chart below shows why each ceiling has to move. The limits are structural —
+they depend on chain size and fragment count, not on latency — so a single
+figure covers every RTT.
+
+![Stock EAP/RADIUS ceilings vs PQC certificate flights, per algorithm](results/ceilings.png)
+
+*Per-algorithm figures from `results/` (mean of 3 auths) against the stock
+ceilings taken verbatim from the diffs in [`patches/`](patches/), generated by
+`scripts/plot_ceilings.py`. **Top:** passthrough round-trips per auth. Stock
+FreeRADIUS aborts above 50 round-trips and stock `wpa_supplicant` above 100, so
+everything from `mldsa65` up fails to authenticate on unpatched software —
+`mldsa44` sits one fragment under the cap at 49. **Bottom:** the reassembled
+server and client flights that reassemble mode carries as single RADIUS
+messages. Every flight but RSA's client flight already exceeds the stock 4096 B
+RADIUS message limit, the larger chains (`mldsa65` up) cross the EAP-TLS length
+guard, and `sphincs192f` alone crosses the 65536 B TLS-record cap. The two panels are complementary: passthrough hits
+the round-trip ceilings, reassemble hits the size ceilings, and the patches lift
+both so either mode can carry PQC.*
+
+### `wpa_supplicant`
+
+Built from the **2.11** release tarball.
+
+| File | Change |
+|------|--------|
+| `src/eap_peer/eap.c` | `EAP_MAX_AUTH_ROUNDS` `100` → `1000` |
+| `src/eap_peer/eap_tls_common.c` | inbound TLS reassembly cap `65536` → `65536 * 100` |
 
 ### `radsecproxy`
 
@@ -420,6 +501,8 @@ Pinned tag: **`release_3_2_8`**.
 | `src/modules/rlm_eap/libeap/eapcommon.c` | EAP-TLS total-length guard → `163840` |
 | `src/modules/rlm_eap/libeap/eap_tls.c` | `fragment_size` upper bound → `65535` |
 | `src/modules/rlm_eap/mem.c` | per-session round-trip cap `50` → `500` |
+
+`FreeRADIUS`'s installed `radiusd.conf` is also tuned (not a source patch): `max_attributes` `200` → `1024`, so a reassembled PQC flight — carried as >200 `EAP-Message` attributes in a single Access-Request — isn't dropped as a suspected DoS. `setup.sh` applies this edit to the installed `radiusd.conf` after `make install`.
 
 ## Proxy module map
 

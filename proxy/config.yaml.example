@@ -19,5 +19,5 @@ upstream:
   host: 127.0.0.1
   port: 11812
   shared_secret: radsec
-  fragment_size: 65000
-  framed_mtu: 65000
+  fragment_size: 60000
+  framed_mtu: 60000

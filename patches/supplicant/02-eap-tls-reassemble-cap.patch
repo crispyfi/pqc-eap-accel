@@ -1,0 +1,12 @@
+diff --git a/src/eap_peer/eap_tls_common.c b/src/eap_peer/eap_tls_common.c
+--- a/src/eap_peer/eap_tls_common.c
++++ b/src/eap_peer/eap_tls_common.c
+@@ -491,7 +491,7 @@
+ 		return -1;
+ 	}
+
+-	if (tls_in_len + in_len > 65536) {
++	if (tls_in_len + in_len > 65536 * 100) {
+ 		/*
+ 		 * Limit length to avoid rogue servers from causing large
+ 		 * memory allocations.

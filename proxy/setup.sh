@@ -28,7 +28,7 @@ apply_patches() {
     if [ ${#patches[@]} -eq 0 ]; then
         echo "!! WARNING: no patches in $dir" >&2
         echo "   building UNPATCHED — large PQC packets will be rejected." >&2
-        echo "   See $REPO_ROOT/patches/README.md to capture them." >&2
+        echo "   See the patches section of $REPO_ROOT/README.md." >&2
         return 0
     fi
     # --recount tolerates hunk line-count drift; --ignore-whitespace lets the
