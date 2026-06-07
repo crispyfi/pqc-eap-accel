@@ -185,8 +185,11 @@ sequenceDiagram
 Each row is the mean of 3 authentications. **Chain bytes** is the reassembled
 server flight (ServerHello … Certificate … ServerHelloDone), and **EAP frags**
 is the total number of EAP-TLS fragments exchanged with the supplicant
-(server→supplicant + supplicant→server). **RTT** is the netem one-way delay
-applied to the RadSec leg. **Upstream
+(server→supplicant + supplicant→server). **RTT** is the latency `tc netem` adds
+to the RadSec leg, set with the `latency` command. It is injected on a single
+direction of that leg, so each upstream round-trip crosses the delayed direction
+once and incurs it once — the column is therefore both the one-way delay and the
+added round-trip latency. **Upstream
 round-trips** counts the RADIUS request/response exchanges that actually cross
 that latent leg.
 
@@ -201,7 +204,7 @@ The gap widens with both certificate size and latency: at 200 ms,
 `sphincssha2192fsimple` drops from 46.2 s (passthrough) to 4.3 s (reassemble),
 and even `mldsa87` drops from 9.6 s to 1.6 s.
 
-Put as a rate: because each upstream round-trip pays the link latency once,
+Put as a rate: because each upstream round-trip pays that RTT once,
 passthrough's wall-clock climbs by roughly its round-trip count for every
 millisecond added to the RadSec leg — about 45 ms/ms for `mldsa87` and
 216 ms/ms for `sphincssha2192fsimple` across the 20–200 ms range. Reassemble's
@@ -387,7 +390,7 @@ A specific algorithm can be loaded for use using the `algorithm` command on the 
 
 A single-tier CA is used for each algorithm, so only end-entity (leaf) certificates are exchanged during authentication. This keeps the lab simple, and reflects how a real deployment would likely behave: a mechanism such as EST (RFC 7030) or another out-of-band trust-anchor distribution would typically pre-provision the CA, removing the need to send intermediate certificates in-band.
 
-**Latency** can be introduced between the **Proxy** and **Authentication Server** by using the `latency` command on each of these VMs.
+**Latency** can be introduced on the RadSec leg between the **Proxy** and **Authentication Server** with the `latency` command. The benchmarks in *Test Results* run it on one VM only, delaying that VM's outbound RadSec, so each upstream round-trip crosses the delayed direction once — the `RTT` column is that single delay. Running `latency` on *both* VMs delays both directions and doubles the per-round-trip cost.
 
 The `freeradius-pqc`, `radsecproxy`, and `eap-accel` processes must be started manually in separate shells for clear visibility of logs during test runs.
 
