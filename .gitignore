@@ -24,3 +24,6 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Internet-Draft working directory (kept local; not published with the repo)
+draft/
