@@ -96,6 +96,16 @@ class Session:
     # verbatim and the Identifier rides along).
     upstream_last_eap_req_id: int | None = None
 
+    # Mirror image of the above for the supplicant leg: the Identifier of the
+    # most recent EAP-Request the SUPPLICANT saw, learned from the Identifier
+    # it echoes on each Response (RFC 3748 §4.1). The terminal EAP-Success /
+    # EAP-Failure we hand back MUST carry this value (§4.2). In reassemble
+    # mode it differs from the upstream server's Identifier because locally
+    # minted ACKs and re-fragmented Requests advance the downstream counter
+    # independently of the upstream one; unused in passthrough, where the
+    # server's terminal packet is relayed verbatim.
+    down_last_req_id: int | None = None
+
     # Reassembly (one per direction) — built lazily so max_message_len applies
     up_reasm: eap_tls.Reassembler = field(default=None)
     down_reasm: eap_tls.Reassembler = field(default=None)
@@ -115,7 +125,10 @@ class Session:
     completed_at: float | None = None
     upstream_round_trips: int = 0  # actual RADIUS/RadSec exchanges to server
     result: str | None = None      # "accept" | "reject" | None (in progress)
+    # Terminal EAP packet from upstream, held until the supplicant has drained
+    # the last server->supplicant fragment and asks for it.
     _pending_success: bytes | None = None
+    _pending_failure: bytes | None = None
 
     def __post_init__(self):
         if self.up_reasm is None:

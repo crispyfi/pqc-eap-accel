@@ -100,6 +100,13 @@ class Mediator:
 
         # --- REASSEMBLE mode below ---
 
+        # Remember what the supplicant's Identifier space is actually at. Same
+        # reasoning as the down_next_id sync above (pkt.identifier echoes the
+        # last EAP-Request the supplicant received), but this one survives past
+        # the ACKs we mint: it is the Identifier the terminal EAP-Success or
+        # EAP-Failure has to carry, and by then down_next_id has moved on.
+        session.down_last_req_id = pkt.identifier
+
         # If the supplicant is ACKing one of OUR downstream fragments, feed the
         # next queued downstream fragment rather than going upstream.
         if pkt.is_ack:
@@ -109,10 +116,15 @@ class Mediator:
             # our entire server->supplicant record. If the upstream auth has
             # already concluded, deliver that terminal result now.
             if session.result == "accept":
-                return {"action": "accept", "eap_bytes": session._pending_success,
-                        "echo_id": None}
+                return {"action": "accept",
+                        "eap_bytes": self._restamp_terminal(
+                            session, session._pending_success),
+                        "echo_id": session.down_last_req_id}
             if session.result == "reject":
-                return {"action": "reject", "eap_bytes": None, "echo_id": None}
+                return {"action": "reject",
+                        "eap_bytes": self._restamp_terminal(
+                            session, session._pending_failure),
+                        "echo_id": session.down_last_req_id}
             # Otherwise poll upstream once more: the supplicant's receipt of the
             # server's flight lets the server proceed to its terminal decision.
             # We send an empty EAP-TLS response upstream to advance it,
@@ -208,12 +220,17 @@ class Mediator:
             session.finish("accept")
             eap = reply["eap_messages"][0] if reply["eap_messages"] else None
             session._pending_success = eap
-            return {"action": "accept", "eap_bytes": eap, "echo_id": None}
+            return {"action": "accept",
+                    "eap_bytes": self._restamp_terminal(session, eap),
+                    "echo_id": session.down_last_req_id}
 
         if reply["reject"]:
             session.finish("reject")
             eap = reply["eap_messages"][0] if reply["eap_messages"] else None
-            return {"action": "reject", "eap_bytes": eap, "echo_id": None}
+            session._pending_failure = eap
+            return {"action": "reject",
+                    "eap_bytes": self._restamp_terminal(session, eap),
+                    "echo_id": session.down_last_req_id}
 
         # Challenge: server sent (part of) an EAP-TLS message. Reassemble it.
         if not reply["eap_messages"]:
@@ -234,12 +251,43 @@ class Mediator:
                 # never forward the half-reassembled buffer to the supplicant,
                 # which would arrive as a TLS message shorter than its declared
                 # length and fail as SEC_E_INCOMPLETE_MESSAGE on Windows.
-                action = "accept" if session.result == "accept" else "reject"
-                return {"action": action, "eap_bytes": None, "echo_id": None}
+                if session.result == "accept":
+                    return {"action": "accept",
+                            "eap_bytes": self._restamp_terminal(
+                                session, session._pending_success),
+                            "echo_id": session.down_last_req_id}
+                return {"action": "reject",
+                        "eap_bytes": self._restamp_terminal(
+                            session, session._pending_failure),
+                        "echo_id": session.down_last_req_id}
 
         session.down.bytes_reassembled += len(complete)
         # Re-fragment the server's record toward the supplicant.
         return self._begin_downstream_fragmentation(session, complete)
+
+    @staticmethod
+    def _restamp_terminal(session, eap: bytes | None) -> bytes | None:
+        """Rewrite a terminal EAP-Success/Failure to the Identifier the
+        supplicant is expecting (RFC 3748 §4.2: the Identifier of the last
+        EAP-Request it saw, which it echoed on its last Response).
+
+        In reassemble mode the upstream server's Identifier space has drifted
+        away from the supplicant's — every ACK we absorb locally and every
+        fragment we re-cut advances the downstream counter without the server
+        ever seeing it. Relaying the server's Success verbatim therefore hands
+        the supplicant a stale Identifier, and wpa_supplicant discards it
+        ("EAP-Success Id mismatch"), never exports the MSK, and times out
+        despite a perfectly good Access-Accept with MPPE keys.
+
+        Only byte 1 of the EAP header changes. Success/Failure are 4-byte
+        packets with no integrity field of their own, and the RADIUS
+        Message-Authenticator is computed over the finished reply on send
+        (downstream_server._build_reply -> add_message_authenticator), so
+        there is nothing else to keep in step.
+        """
+        if not eap or len(eap) < 2 or session.down_last_req_id is None:
+            return eap
+        return eap[:1] + bytes([session.down_last_req_id]) + eap[2:]
 
     def _drain_upstream_fragments(self, session, last_pkt,
                                   username, calling_station, called_station):
@@ -273,7 +321,17 @@ class Mediator:
             )
             session.radius_state = reply["state"]
             if reply["accept"] or reply["reject"]:
-                session.finish("accept" if reply["accept"] else "reject")
+                # Stash the terminal EAP packet before unwinding: the caller
+                # has to hand it to the supplicant (an Access-Accept with no
+                # EAP-Success leaves the supplicant waiting until it times
+                # out), and this is the only place we still see it.
+                terminal = reply["eap_messages"][0] if reply["eap_messages"] else None
+                if reply["accept"]:
+                    session.finish("accept")
+                    session._pending_success = terminal
+                else:
+                    session.finish("reject")
+                    session._pending_failure = terminal
                 return None
             if not reply["eap_messages"]:
                 break
