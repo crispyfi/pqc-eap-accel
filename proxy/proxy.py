@@ -9,6 +9,7 @@ Run (installed as the `eap-accel` command by `uv sync`; see proxy/INSTALL.md):
     eap-accel                                         # uses config.yaml
     eap-accel path/to/cfg.yaml                        # custom path
     eap-accel --mode reassemble --fragment-size 1024 --framed-mtu 4000
+    eap-accel --mode reassemble --strip-framed-mtu   # server's fragment_size only
 
 Or directly during development, from the repo root:
     uv run eap-accel --mode passthrough
@@ -67,6 +68,15 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
              "AP-undeliverable fragments)",
     )
     parser.add_argument(
+        "--strip-framed-mtu", action="store_true", default=False,
+        dest="strip_framed_mtu",
+        help="Omit Framed-MTU from upstream Access-Requests entirely, so the "
+             "auth server's own fragment size is the sole bound on upstream "
+             "fragment length. Takes precedence over --framed-mtu / "
+             "config.yaml `upstream.framed_mtu`; like them, honoured only in "
+             "reassemble mode",
+    )
+    parser.add_argument(
         "--output", default=None, dest="output_dir", metavar="DIR",
         help="Directory for per-auth JSON records. Overrides config.yaml "
              "`output_dir`; defaults to proxy/output",
@@ -105,8 +115,14 @@ def main(argv: list[str]) -> int:
         cfg.mode = args.mode
     if args.fragment_size is not None:
         cfg.downstream.fragment_size = args.fragment_size
+    # An explicit --framed-mtu asks for a specific advertised value, so it
+    # clears a strip set in config.yaml; --strip-framed-mtu wins over a
+    # framed_mtu that came from config.yaml (which ships one by default).
     if args.framed_mtu is not None:
         cfg.upstream.framed_mtu = args.framed_mtu
+        cfg.upstream.strip_framed_mtu = False
+    if args.strip_framed_mtu:
+        cfg.upstream.strip_framed_mtu = True
     if args.output_dir is not None:
         cfg.output_dir = args.output_dir
     cfg.validate()
@@ -120,7 +136,13 @@ def main(argv: list[str]) -> int:
     log.info("starting in mode=%s downstream.fragment_size=%d "
              "upstream.framed_mtu=%s",
              cfg.mode,
-             cfg.downstream.fragment_size, cfg.upstream.framed_mtu)
+             cfg.downstream.fragment_size,
+             "stripped" if cfg.upstream.strip_framed_mtu
+             else cfg.upstream.framed_mtu)
+    if cfg.upstream.strip_framed_mtu and cfg.mode != "reassemble":
+        log.warning("strip_framed_mtu is set but mode=%s — the AP's Framed-MTU "
+                    "is forwarded verbatim (stripping applies to reassemble "
+                    "mode only)", cfg.mode)
     log.info("downstream listen %s:%d  upstream %s:%d",
              cfg.downstream.listen_host, cfg.downstream.listen_port,
              cfg.upstream.host, cfg.upstream.port)
@@ -136,6 +158,7 @@ def main(argv: list[str]) -> int:
         port=cfg.upstream.port,
         secret=cfg.upstream.shared_secret,
         framed_mtu_override=cfg.upstream.framed_mtu,
+        strip_framed_mtu=cfg.upstream.strip_framed_mtu,
     )
     mediator = Mediator(upstream)
     reporter = Reporter(cfg.output_dir)

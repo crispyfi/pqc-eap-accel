@@ -30,6 +30,12 @@ class UpstreamConfig:
     shared_secret: str
     fragment_size: int
     framed_mtu: int | None = None
+    # True -> omit Framed-MTU from upstream Access-Requests entirely, so the
+    # auth server's own fragment size is the only bound on upstream fragment
+    # length (FreeRADIUS uses min(fragment_size, Framed-MTU) only when the
+    # attribute is present). Takes precedence over framed_mtu. Like the
+    # override, honoured only in reassemble mode.
+    strip_framed_mtu: bool = False
 
 @dataclass
 class Config:
@@ -48,6 +54,8 @@ class Config:
             raise ValueError("upstream.fragment_size out of range")
         if self.upstream.framed_mtu is not None and not (1 <= self.upstream.framed_mtu <= 65000):
             raise ValueError("upstream.framed_mtu out of range")
+        if not isinstance(self.upstream.strip_framed_mtu, bool):
+            raise ValueError("upstream.strip_framed_mtu must be a boolean")
         if self.max_message_len < 4096:
             raise ValueError("max_message_len too small for any real cert chain")
 

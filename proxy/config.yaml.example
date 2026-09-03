@@ -21,3 +21,4 @@ upstream:
   shared_secret: radsec
   fragment_size: 60000
   framed_mtu: 60000
+  strip_framed_mtu: false

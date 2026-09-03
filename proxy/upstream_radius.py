@@ -181,7 +181,8 @@ class UpstreamClient:
 
     def __init__(self, host: str, port: int, secret: bytes,
                  timeout_s: float = 10.0,
-                 framed_mtu_override: int | None = None):
+                 framed_mtu_override: int | None = None,
+                 strip_framed_mtu: bool = False):
         self.host = host
         self.port = port
         self.secret = secret if isinstance(secret, bytes) else secret.encode()
@@ -191,6 +192,10 @@ class UpstreamClient:
         #          FreeRADIUS's min(fragment_size, Framed-MTU) isn't pinned to
         #          the small AP-link MTU when we're reassembling locally.
         self.framed_mtu_override = framed_mtu_override
+        # True -> drop Framed-MTU from the upstream request altogether, leaving
+        # the auth server's configured fragment size as the sole bound on
+        # upstream fragment length. Takes precedence over the override above.
+        self.strip_framed_mtu = strip_framed_mtu
         self.dict = _build_dictionary()
         # _BigReplyClient (not Client) so >4096-byte upstream Access-Challenges
         # carrying large PQC server-cert fragments aren't truncated on recv.
@@ -247,15 +252,25 @@ class UpstreamClient:
         # link MTU is ~1100; the AP can't deliver it as a single EAPOL frame
         # and the auth stalls. So in passthrough we always forward the AP's
         # real Framed-MTU regardless of config.yaml. See config.yaml comment.
+        # Stripping is gated on reassemble for the same reason as the
+        # override: without Framed-MTU the server fragments purely to its own
+        # configured size, which in passthrough would be forwarded verbatim to
+        # an AP that can't deliver it.
+        reassembling = session.mode == "reassemble"
+        strip_mtu = self.strip_framed_mtu and reassembling
         apply_mtu_override = (
             self.framed_mtu_override is not None
-            and session.mode == "reassemble"
+            and not strip_mtu
+            and reassembling
         )
         for name, value in session.ap_attrs.items():
-            if name == "Framed-MTU" and apply_mtu_override:
-                req[name] = self.framed_mtu_override
-            else:
-                req[name] = value
+            if name == "Framed-MTU":
+                if strip_mtu:
+                    continue
+                if apply_mtu_override:
+                    req[name] = self.framed_mtu_override
+                    continue
+            req[name] = value
 
         # Split EAP payload into <=253-byte EAP-Message attributes.
         for chunk in _split_eap_message(eap_payload):
