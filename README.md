@@ -444,6 +444,24 @@ p256_sphincssha2128ssimple
 rsa
 ```
 
+### Key exchange (KEM) group
+
+The certificate signature algorithm and the TLS 1.3 key exchange are configured
+independently. All results in this README use `X25519MLKEM768` (X25519 +
+ML-KEM-768) across every algorithm.
+
+Configured here:
+
+| File | Setting | Current value |
+|---|---|---|
+| `auth-server/eap` | `ecdh_curve` | `X25519MLKEM768:x25519:secp256r1` |
+| `supplicant/openssl.conf` | `Groups` under `[system_default_sect]` | `X25519MLKEM768:SecP256r1MLKEM768:SecP384r1MLKEM1024:p521_mlkem1024:mlkem512:mlkem768:mlkem1024:x25519:secp256r1:secp384r1:secp521r1` |
+
+The supplicant sends a key share only for the **first** group in its list, so
+that entry must match the server's preference. If it doesn't, the server
+responds with a HelloRetryRequest, adding a round-trip across the latent leg
+and skewing the timings.
+
 ---
 
 ## wpa_supplicant, FreeRADIUS and radsecproxy patches
