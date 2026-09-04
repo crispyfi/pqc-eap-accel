@@ -300,6 +300,9 @@ generated from the table below by `scripts/plot_results.py`.*
 
 Packet captures for a subset of test runs are available in `pcaps/`.
 
+`pcaps/mlkem1024/` holds an ML-DSA-87 / ML-KEM-1024 run at 100 ms, captured both
+over the air at the AP (`-ota`) and at the proxy (`-proxy`).
+
 ## Testbed Architecture
 
 The EAP Proxy is deployed between the Authenticator and the Authentication Server.
@@ -447,15 +450,16 @@ rsa
 ### Key exchange (KEM) group
 
 The certificate signature algorithm and the TLS 1.3 key exchange are configured
-independently. All results in this README use `X25519MLKEM768` (X25519 +
-ML-KEM-768) across every algorithm.
+independently. The testbed is currently configured for `SecP384r1MLKEM1024`
+(P-384 + ML-KEM-1024) across every algorithm. The results above were gathered
+under the previous group, `X25519MLKEM768`.
 
 Configured here:
 
 | File | Setting | Current value |
 |---|---|---|
-| `auth-server/eap` | `ecdh_curve` | `X25519MLKEM768:x25519:secp256r1` |
-| `supplicant/openssl.conf` | `Groups` under `[system_default_sect]` | `X25519MLKEM768:SecP256r1MLKEM768:SecP384r1MLKEM1024:p521_mlkem1024:mlkem512:mlkem768:mlkem1024:x25519:secp256r1:secp384r1:secp521r1` |
+| `auth-server/eap` | `ecdh_curve` | `SecP384r1MLKEM1024:x25519:secp256r1` |
+| `supplicant/openssl.conf` | `Groups` under `[system_default_sect]` | `SecP384r1MLKEM1024:X25519MLKEM768:SecP256r1MLKEM768:p521_mlkem1024:mlkem512:mlkem768:mlkem1024:x25519:secp256r1:secp384r1:secp521r1` |
 
 The supplicant sends a key share only for the **first** group in its list, so
 that entry must match the server's preference. If it doesn't, the server
