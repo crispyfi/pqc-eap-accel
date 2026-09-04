@@ -16,6 +16,8 @@ output/
 
 # Whitelisted canonical captures referenced from README.md ("Packet captures").
 !pcaps/*.pcapng
+!pcaps/mlkem1024/*.pcap
+!pcaps/mlkem1024/*.pcapng
 
 # Python
 .venv/
